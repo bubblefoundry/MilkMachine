@@ -7,6 +7,24 @@ import simplekml
 from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsPoint, QgsVectorFileWriter
 from qgis.gui import QgsMessageBar
 
+def memoize(function):
+    """
+    Function decorator to memoize expensive function calls
+    """
+    from functools import wraps
+
+    memo = {}
+
+    @wraps(function)
+    def wrapper(*args):
+        if args in memo:
+            return memo[args]
+        else:
+            rv = function(*args)
+            memo[args] = rv
+            return rv
+    return wrapper
+
 def wgs84LatLonToUTMZone(latitude, longitude):
     """
     Finds the UTM zone which contains the given WGS84 point.
@@ -49,6 +67,7 @@ def wgs84LatLonToUTMZone(latitude, longitude):
 
     return zone, latBand
 
+@memoize
 def makeCoordinateReferenceSystem(latitude, utmZone):
     """
     Creates a coordinate reference system, for instance for converting to this system.
@@ -66,10 +85,14 @@ def makeCoordinateReferenceSystem(latitude, utmZone):
     >>> makeCoordinateReferenceSystem(13.41250188, 21442) is None
     True
     """
-    crs = QgsCoordinateReferenceSystem()
     proj4String = "+proj=utm +ellps=WGS84 +datum=WGS84 +units=m +zone=%s" % utmZone
     if latitude < 0:
         proj4String += " +south"
+    return crsCreateFromProj4(proj4String)
+
+@memoize
+def crsCreateFromProj4(proj4String):
+    crs = QgsCoordinateReferenceSystem()
     result = crs.createFromProj4(proj4String)
     return crs if result and crs.isValid() else None
 
